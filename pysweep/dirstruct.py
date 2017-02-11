@@ -20,11 +20,11 @@ The idea:
 
 # Another Dir-like object
     >>> x.get('images')
-    <__main__.TarDir object at ...>
+    <...TarDir object at 0x...>
 
 # Dir-like object, but it refers to a file.
     >>> x.get('images/border/tl.png')
-    <__main__.TarDir object at ...>
+    <...TarDir object at 0x...>
 
 # You can open files by calling .open
     >>> x.get('images/border/tl.png').open()
@@ -32,7 +32,7 @@ The idea:
 
 # also works
     >>> x.get('images').get('border').get('tl.png')
-    <__main__.TarDir object at ...>
+    <...TarDir object at 0x...>
 
 
 
@@ -81,6 +81,25 @@ class Multi:
             except:
                 pass
         return Multi(*result)
+    def multi_map_one(self, map_):
+        exceptions = ''
+        for item in self.__multi_items:
+            try:
+                return map_(item)
+            except Exception as e:
+                import traceback
+                exceptions += traceback.format_exc()
+        else:
+            raise RuntimeError(
+f'''None of the items could be mapped.
+
+****
+
+The following exceptions occurred while trying to map the items:
+
+{exceptions}
+****
+''')
     def multi_filter(self, filter_):
         result = filter(filter_, self.__multi_items)
         return Multi(*result)
@@ -95,13 +114,24 @@ class Multi:
     def __str__(self):
         return str(self.__multi_items)
     def call_one(self, *args, **kwargs):
+        exceptions = ''
         for item in self.__multi_items:
             try:
                 return item(*args, **kwargs)
             except:
-                pass
+                import traceback
+                exceptions += traceback.format_exc()
         else:
-            raise RuntimeError('None of the items could be called')
+            raise RuntimeError(
+f'''None of the items could be called
+
+****
+
+The following exceptions occurred while trying to map the items:
+
+{exceptions}
+****
+''')
     def get_first(self):
         return self.__multi_items[0]
 
@@ -110,7 +140,7 @@ class DirBase:
         return self.get(path)
     def __getitem__(self, path):
         return self.get(path)
-    def get(self, path, *args, **kwargs):
+    def get(self, path):
         """
         Returns another object that implents DirBase.
         """
@@ -138,6 +168,9 @@ class Dir(DirBase):
     def open(self, *args, **kwargs):
         return self._path.open(*args, **kwargs)
 
+    def __hash__(self):
+        return hash(str(self._path))
+
     def __eq__(self, other):
         return self._path == other._path
 
@@ -164,6 +197,9 @@ class TarDir(DirBase):
         return self._tarpath.joinpath(self._path)
     def open(self, *args, **kwargs):
         return self._tar.extractfile(str(self._path))
+
+    def __hash__(self):
+        return hash((self._tar, str(self._path)))
 
     def __eq__(self, other):
         return self._tar == other._tar and self._path == other._path

@@ -1,3 +1,5 @@
 #!/usr/bin/python3
 
-import pysweep.__main__
+from pysweep.__main__ import main
+
+main()

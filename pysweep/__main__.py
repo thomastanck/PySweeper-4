@@ -33,5 +33,5 @@ def main():
     except tkinter.TclError as e:
         pass
 
-# if __name__ == '__main__':
-main()
+if __name__ == '__main__':
+    main()
