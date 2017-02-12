@@ -32,7 +32,7 @@ The idea:
     <...TarDir tarpath='images.tar.gz' path='images/border/tl.png' at 0x...>
 
 # You can open files by calling .open
-    >>> x.get('border/tl.png').open()
+    >>> x.get('border/tl.png').open('rb')
     <ExFileObject name='images.tar.gz'>
 
 # also works
@@ -62,31 +62,31 @@ class Multi:
 
     # images_d_tiles does not have borders,
     # so trying to open it gets you the one in images
-        >>> m.border['b.png'].open.call_one()
-        <_io.TextIOWrapper name='images/border/b.png' mode='r' encoding='UTF-8'>
+        >>> m.border['b.png'].open.call_one('rb')
+        <_io.BufferedReader name='images/border/b.png'>
 
     # images_d_tiles does have tiles,
     # so trying to open it gets you the one in images_d_tiles
     # since images_d_tiles comes first in the Multi.
-        >>> m.board.tile['0.png'].open.call_one()
-        <_io.TextIOWrapper name='images_d_tiles/board/tile/0.png' mode='r' encoding='UTF-8'>
+        >>> m.board.tile['0.png'].open.call_one('rb')
+        <_io.BufferedReader name='images_d_tiles/board/tile/0.png'>
 
     # If you don't use call_one,
     # it will call every item in the Multi, filtering out those that raise exceptions.
-        >>> m.board.tile['0.png'].open()
-        (<_io.TextIOWrapper name='images_d_tiles/board/tile/0.png' mode='r' encoding='UTF-8'>, <_io.TextIOWrapper name='images/board/tile/0.png' mode='r' encoding='UTF-8'>)
+        >>> m.board.tile['0.png'].open('rb')
+        (<_io.BufferedReader name='images_d_tiles/board/tile/0.png'>, <_io.BufferedReader name='images/board/tile/0.png'>)
 
-        >>> m.border['b.png'].open()
-        (<_io.TextIOWrapper name='images/border/b.png' mode='r' encoding='UTF-8'>,)
+        >>> m.border['b.png'].open('rb')
+        (<_io.BufferedReader name='images/border/b.png'>,)
 
     # Raises a RuntimeError if none of the items remain,
-        >>> m.aoeuaoeu['lol.png'].open()
+        >>> m.aoeuaoeu['lol.png'].open('rb')
         Traceback (most recent call last):
           ...
         RuntimeError: Need at least one item in Multi
 
     # or trying to call_one when none of the calls are successful.
-        >>> m.aoeuaoeu['lol.png'].open.call_one()
+        >>> m.aoeuaoeu['lol.png'].open.call_one('rb')
         Traceback (most recent call last):
           ...
         RuntimeError: None of the items could be called
