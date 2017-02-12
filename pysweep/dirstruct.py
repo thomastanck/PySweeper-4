@@ -18,21 +18,26 @@ The idea:
 # Dir-like object
     >>> x = TarDir('images.tar.gz')
 
-# Another Dir-like object
-    >>> x.get('images')
-    <...TarDir object at 0x...>
+# Using get gives you another Dir-like object
+    >>> x = Dir('images')
+    >>> x.get('border')
+    <...Dir path='images/border' at 0x...>
+
+    >>> x = TarDir('images.tar.gz').images
+    >>> x
+    <...TarDir tarpath='images.tar.gz' path='images' at 0x...>
 
 # Dir-like object, but it refers to a file.
-    >>> x.get('images/border/tl.png')
-    <...TarDir object at 0x...>
+    >>> x.get('border/tl.png')
+    <...TarDir tarpath='images.tar.gz' path='images/border/tl.png' at 0x...>
 
 # You can open files by calling .open
-    >>> x.get('images/border/tl.png').open()
+    >>> x.get('border/tl.png').open()
     <ExFileObject name='images.tar.gz'>
 
 # also works
-    >>> x.get('images').get('border').get('tl.png')
-    <...TarDir object at 0x...>
+    >>> x.get('border').get('tl.png')
+    <...TarDir tarpath='images.tar.gz' path='images/border/tl.png' at 0x...>
 
 
 
@@ -199,6 +204,9 @@ class Dir(DirBase):
     def open(self, *args, **kwargs):
         return self._path.open(*args, **kwargs)
 
+    def __repr__(self):
+        return f'''<{self.__module__}.{self.__class__.__name__} path='{str(self._path)}' at 0x{id(self):x}>'''
+
     def __hash__(self):
         return hash(str(self._path))
 
@@ -211,7 +219,7 @@ import tarfile
 class TarDir(DirBase):
     def __init__(self, path, *args, _tar=None, _tarpath='', _path='', **kwargs):
         if not _tar:
-            self._tarpath = PurePath(_tarpath)
+            self._tarpath = PurePath(path)
             self._tar = tarfile.open(path, *args, **kwargs)
             self._path = PurePath(_path)
         else:
@@ -228,6 +236,9 @@ class TarDir(DirBase):
         return self._tarpath.joinpath(self._path)
     def open(self, *args, **kwargs):
         return self._tar.extractfile(str(self._path))
+
+    def __repr__(self):
+        return f'''<{self.__module__}.{self.__class__.__name__} tarpath='{str(self._tarpath)}' path='{str(self._path)}' at 0x{id(self):x}>'''
 
     def __hash__(self):
         return hash((self._tar, str(self._path)))
