@@ -70,8 +70,39 @@ class Multi:
     # it will call every item in the Multi, filtering out those that raise exceptions.
         >>> m.board.tile['0.png'].open()
         (<_io.TextIOWrapper name='images_d_tiles/board/tile/0.png' mode='r' encoding='UTF-8'>, <_io.TextIOWrapper name='images/board/tile/0.png' mode='r' encoding='UTF-8'>)
+
+        >>> m.border['b.png'].open()
+        (<_io.TextIOWrapper name='images/border/b.png' mode='r' encoding='UTF-8'>,)
+
+    # Raises a RuntimeError if none of the items remain,
+        >>> m.aoeuaoeu['lol.png'].open()
+        Traceback (most recent call last):
+          ...
+        RuntimeError: Need at least one item in Multi
+
+    # or trying to call_one when none of the calls are successful.
+        >>> m.aoeuaoeu['lol.png'].open.call_one()
+        Traceback (most recent call last):
+          ...
+        RuntimeError: None of the items could be called
+        <BLANKLINE>
+        ****
+        <BLANKLINE>
+        The following exceptions occurred while trying to map the items:
+        <BLANKLINE>
+        Traceback (most recent call last):
+          ...
+        FileNotFoundError: [Errno 2] No such file or directory: 'images_d_tiles/aoeuaoeu/lol.png'
+        Traceback (most recent call last):
+          ...
+        FileNotFoundError: [Errno 2] No such file or directory: 'images/aoeuaoeu/lol.png'
+        <BLANKLINE>
+        ****
+        <BLANKLINE>
     """
     def __init__(self, *items):
+        if len(items) == 0:
+            raise RuntimeError('Need at least one item in Multi')
         self.__multi_items = items
     def multi_map(self, map_):
         result = []
