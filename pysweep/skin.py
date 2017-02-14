@@ -3,6 +3,8 @@ from pathlib import PurePath
 from PIL import Image
 
 from .dirstruct import Multi, DirBase
+from .box import Thickness # For border validation
+
 
 class ImageLoader(DirBase):
     """
@@ -364,51 +366,51 @@ class Skin(ImageLoader):
                     raise SpriteException(f'''Sprites must be of the same size. Expected size {size} from '{firstpath}', but '{path}' has size {img.size}.''')
 
     def _validate_border(self, b, bl, br, l, r, t, tl, tr):
-        thickness = [None] * 4
-        # Check top size
-        for key in (tl, t, tr):
-            img = self[key].open()
-            if thickness[0] == None:
-                thickness[0] = img.size[1]
-                firstpath = key
-            else:
-                try:
-                    assert thickness[0] == img.size[1]
-                except AssertionError as e:
-                    raise BorderException(f'''All borders must have consistent thickness. Expected height {thickness[0]} from {firstpath} but '{key}' has height {img.size[1]}.''')
-        # Check left size
-        for key in (tl, l, bl):
-            img = self[key].open()
-            if thickness[1] == None:
-                thickness[1] = img.size[0]
-                firstpath = key
-            else:
-                try:
-                    assert thickness[1] == img.size[0]
-                except AssertionError as e:
-                    raise BorderException(f'''All borders must have consistent thickness. Expected width {thickness[1]} from {firstpath} but '{key}' has width {img.size[0]}.''')
-        # Check right size
-        for key in (tr, r, br):
-            img = self[key].open()
-            if thickness[2] == None:
-                thickness[2] = img.size[0]
-                firstpath = key
-            else:
-                try:
-                    assert thickness[2] == img.size[0]
-                except AssertionError as e:
-                    raise BorderException(f'''All borders must have consistent thickness. Expected width {thickness[2]} from {firstpath} but '{key}' has width {img.size[0]}.''')
+        thickness = Thickness(None, None, None, None)
         # Check bottom size
         for key in (bl, b, br):
             img = self[key].open()
-            if thickness[3] == None:
-                thickness[3] = img.size[1]
+            if thickness.b == None:
+                thickness.b = img.size[1]
                 firstpath = key
             else:
                 try:
-                    assert thickness[3] == img.size[1]
+                    assert thickness.b == img.size[1]
                 except AssertionError as e:
-                    raise BorderException(f'''All borders must have consistent thickness. Expected height {thickness[3]} from {firstpath} but '{key}' has height {img.size[1]}.''')
+                    raise BorderException(f'''All borders must have consistent thickness. Expected height {thickness.b} from {firstpath} but '{key}' has height {img.size[1]}.''')
+        # Check left size
+        for key in (tl, l, bl):
+            img = self[key].open()
+            if thickness.l == None:
+                thickness.l = img.size[0]
+                firstpath = key
+            else:
+                try:
+                    assert thickness.l == img.size[0]
+                except AssertionError as e:
+                    raise BorderException(f'''All borders must have consistent thickness. Expected width {thickness.l} from {firstpath} but '{key}' has width {img.size[0]}.''')
+        # Check right size
+        for key in (tr, r, br):
+            img = self[key].open()
+            if thickness.r == None:
+                thickness.r = img.size[0]
+                firstpath = key
+            else:
+                try:
+                    assert thickness.r == img.size[0]
+                except AssertionError as e:
+                    raise BorderException(f'''All borders must have consistent thickness. Expected width {thickness.r} from {firstpath} but '{key}' has width {img.size[0]}.''')
+        # Check top size
+        for key in (tl, t, tr):
+            img = self[key].open()
+            if thickness.t == None:
+                thickness.t = img.size[1]
+                firstpath = key
+            else:
+                try:
+                    assert thickness.t == img.size[1]
+                except AssertionError as e:
+                    raise BorderException(f'''All borders must have consistent thickness. Expected height {thickness.t} from {firstpath} but '{key}' has height {img.size[1]}.''')
 
 
 if __name__ == "__main__":
