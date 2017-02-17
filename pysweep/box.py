@@ -136,12 +136,12 @@ class Box:
         pass
 
 class HSplitBox(Box):
-    def __init__(self, top, bottom, matchwidths=True, expandfactor=1):
+    def __init__(self, *subboxes, matchwidths=True, expandfactor=1):
         """
-        Makes a box around two sub boxes, arranging them vertically.
+        Makes a box around sub boxes, arranging them vertically.
 
         If `matchwidths` is True,
-        it will try to match the widths of the two subboxes by calling `.expand` on the narrower box.
+        it will try to match the widths of two subboxes by calling `.expand` on the narrower box.
 
         Two boxes with nonzero expandfactors:
             >>> b1 = Box(2, 10)
@@ -212,31 +212,34 @@ class HSplitBox(Box):
             >>> b1.size, b2.size, hsb.size, b1.offset, b2.offset, hsb.offset
             ((2, 10), (2, 20), (2, 35), (0, 0), (0, 10), (0, 0))
         """
-        self.top = top
-        self.bottom = bottom
+        self.subboxes = subboxes
         self.matchwidths = matchwidths
 
-        Box.__init__(self, max(top.minwidth, bottom.minwidth), top.minheight + bottom.minheight, expandfactor)
+        Box.__init__(self, max(b.minwidth for b in subboxes), sum(b.minheight for b in subboxes), expandfactor)
 
         if matchwidths:
-            if top.width >= bottom.width:
-                bottom.expand(top.width, None)
-            else:
-                top.expand(bottom.width, None)
+            for b in subboxes:
+                b.expand(self.minwidth, None)
+            # if top.width >= bottom.width:
+            #     bottom.expand(top.width, None)
+            # else:
+            #     top.expand(bottom.width, None)
 
     def expand(self, width, height):
         Box.expand(self, width, height)
 
         if self.matchwidths:
-            self.bottom.expand(self.top.width, None)
-            self.top.expand(self.bottom.width, None)
+            for b in self.subboxes:
+                b.expand(width, None)
+            # self.bottom.expand(width, None)
+            # self.top.expand(width, None)
 
         excessheight = height - self.minheight
 
-        total_ef = self.top.expandfactor + self.bottom.expandfactor
+        total_ef = sum(b.expandfactor for b in self.subboxes)
 
         if total_ef == 0:
-            # Neither the top or the bottom want to expand,
+            # None of the subboxes want to expand,
             # so we don't expand at all.
             return
 

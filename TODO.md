@@ -1,0 +1,11 @@
+- Game mode manager
+- Menu
+- Ultra dumb display
+- Input hooks into tkinter
+- Processing raw inputs into (input) events.
+- Processing (input) events into (player) actions.
+- Minesweeper game logic/convenience functions
+- Actions into gameplay
+- RNG
+- PySweeper
+- Video file
