@@ -1,4 +1,3 @@
-from enum import Enum
 from collections import namedtuple
 import itertools
 
@@ -102,6 +101,11 @@ class Box:
         """ Look like a x/y tuple """
         return (self.offset_x, self.offset_y)
     @property
+    def boxcoords(self):
+        """ Look like a x1/y1/x2/y2 tuple (for PIL) """
+        return (self.offset_x, self.offset_y,
+                self.offset_x+self.width, self.offset_y+self.height)
+    @property
     def offset_x(self):
         """ Sum of local and parent x offsets """
         return self.localoffset_x + self.parentoffset_x
@@ -134,6 +138,9 @@ class Box:
         self.update_child_offsets()
 
     def update_child_offsets(self):
+        pass
+
+    def draw(self):
         pass
 
 class HSplitBox(Box):
@@ -254,26 +261,27 @@ class HSplitBox(Box):
             for b in self.subboxes:
                 b.expand(width, None)
 
-        excessheight = height - self.minheight
+        if height:
+            excessheight = height - self.minheight
 
-        # cumulative expand factor
-        cum_ef = list(itertools.accumulate(b.expandfactor for b in self.subboxes))
-        total_ef = cum_ef[-1]
+            # cumulative expand factor
+            cum_ef = list(itertools.accumulate(b.expandfactor for b in self.subboxes))
+            total_ef = cum_ef[-1]
 
-        if total_ef == 0:
-            # None of the subboxes want to expand,
-            # so we don't expand at all.
-            return
+            if total_ef == 0:
+                # None of the subboxes want to expand,
+                # so we don't expand at all.
+                return
 
-        prev_cum_exp = 0
+            prev_cum_exp = 0
 
-        for b, ef in zip(self.subboxes, cum_ef):
-            # cumulative expansion
-            cum_exp = int(excessheight * ef / total_ef)
-            # expansion for this subbox
-            exp = cum_exp - prev_cum_exp
-            b.expand(None, b.minheight + exp)
-            prev_cum_exp = cum_exp
+            for b, ef in zip(self.subboxes, cum_ef):
+                # cumulative expansion
+                cum_exp = int(excessheight * ef / total_ef)
+                # expansion for this subbox
+                exp = cum_exp - prev_cum_exp
+                b.expand(None, b.minheight + exp)
+                prev_cum_exp = cum_exp
 
         self.update_child_offsets()
 
@@ -282,6 +290,10 @@ class HSplitBox(Box):
         for b in self.subboxes:
             b.set_parentoffset(self.offset_x, self.offset_y + offset_y)
             offset_y += b.height
+
+    def draw(self):
+        for b in self.subboxes:
+            b.draw()
 
 class VSplitBox(Box):
     def __init__(self, *subboxes, matchheights=True, expandfactor=1):
@@ -401,26 +413,27 @@ class VSplitBox(Box):
             for b in self.subboxes:
                 b.expand(None, height)
 
-        excesswidth = width - self.minwidth
+        if width:
+            excesswidth = width - self.minwidth
 
-        # cumulative expand factor
-        cum_ef = list(itertools.accumulate(b.expandfactor for b in self.subboxes))
-        total_ef = cum_ef[-1]
+            # cumulative expand factor
+            cum_ef = list(itertools.accumulate(b.expandfactor for b in self.subboxes))
+            total_ef = cum_ef[-1]
 
-        if total_ef == 0:
-            # Neither the left or the right want to expand,
-            # so we don't expand at all.
-            return
+            if total_ef == 0:
+                # Neither the left or the right want to expand,
+                # so we don't expand at all.
+                return
 
-        prev_cum_exp = 0
+            prev_cum_exp = 0
 
-        for b, ef in zip(self.subboxes, cum_ef):
-            # cumulative expansion
-            cum_exp = int(excesswidth * ef / total_ef)
-            # expansion for this subbox
-            exp = cum_exp - prev_cum_exp
-            b.expand(b.minwidth + exp, None)
-            prev_cum_exp = cum_exp
+            for b, ef in zip(self.subboxes, cum_ef):
+                # cumulative expansion
+                cum_exp = int(excesswidth * ef / total_ef)
+                # expansion for this subbox
+                exp = cum_exp - prev_cum_exp
+                b.expand(b.minwidth + exp, None)
+                prev_cum_exp = cum_exp
 
         self.update_child_offsets()
 
@@ -429,6 +442,10 @@ class VSplitBox(Box):
         for b in self.subboxes:
             b.set_parentoffset(self.offset_x + offset_x, self.offset_y)
             offset_x += b.width
+
+    def draw(self):
+        for b in self.subboxes:
+            b.draw()
 
 class LayerBox(Box):
     def __init__(self, *subboxes, matchsizes=True, expandfactor=1):
@@ -468,6 +485,10 @@ class LayerBox(Box):
         for b in self.subboxes:
             b.set_parentoffset(self.offset_x, self.offset_y)
 
+    def draw(self):
+        for b in self.subboxes:
+            b.draw()
+
 class BorderBox(Box):
     def __init__(self, innerbox, thickness=None, expandfactor=1):
         """
@@ -494,8 +515,8 @@ class BorderBox(Box):
         Box.__init__(self, innerbox.width + thickness.width, innerbox.height + thickness.height, expandfactor)
 
     def expand(self, width, height):
-        innerwidth = width - self.thickness.width
-        innerheight = height - self.thickness.height
+        innerwidth = width - self.thickness.width if width else None
+        innerheight = height - self.thickness.height if height else None
 
         self.innerbox.expand(innerwidth, innerheight)
 
@@ -503,6 +524,9 @@ class BorderBox(Box):
 
     def update_child_offsets(self):
         self.innerbox.set_parentoffset(self.offset_x + self.thickness.l, self.offset_y + self.thickness.t)
+
+    def draw(self):
+        self.innerbox.draw()
 
 if __name__ == "__main__":
     import doctest
