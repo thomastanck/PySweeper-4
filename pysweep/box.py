@@ -1,5 +1,6 @@
 from enum import Enum
 from collections import namedtuple
+import itertools
 
 
 class Thickness:
@@ -211,6 +212,31 @@ class HSplitBox(Box):
 
             >>> b1.size, b2.size, hsb.size, b1.offset, b2.offset, hsb.offset
             ((2, 10), (2, 20), (2, 35), (0, 0), (0, 10), (0, 0))
+
+        Many boxes:
+            >>> b1 = Box(2, 10)
+            >>> b2 = Box(1, 20, expandfactor=3)
+            >>> b3 = Box(3, 30, expandfactor=0)
+            >>> b4 = Box(4, 40, expandfactor=1)
+            >>> hsb = HSplitBox(b1, b2, b3, b4, matchwidths=True)
+
+            >>> b1.size, b2.size, b3.size, b4.size, hsb.size, b1.offset, b2.offset, b3.offset, b4.offset, hsb.offset
+            ((4, 10), (4, 20), (4, 30), (4, 40), (4, 100), (0, 0), (0, 10), (0, 30), (0, 60), (0, 0))
+
+            >>> hsb.expand(None, 110)
+
+            >>> b1.size, b2.size, b3.size, b4.size, hsb.size, b1.offset, b2.offset, b3.offset, b4.offset, hsb.offset
+            ((4, 12), (4, 26), (4, 30), (4, 42), (4, 110), (0, 0), (0, 12), (0, 38), (0, 68), (0, 0))
+
+            >>> hsb.expand(None, 109)
+
+            >>> b1.size, b2.size, b3.size, b4.size, hsb.size, b1.offset, b2.offset, b3.offset, b4.offset, hsb.offset
+            ((4, 11), (4, 26), (4, 30), (4, 42), (4, 109), (0, 0), (0, 11), (0, 37), (0, 67), (0, 0))
+
+            >>> hsb.expand(None, 111)
+
+            >>> b1.size, b2.size, b3.size, b4.size, hsb.size, b1.offset, b2.offset, b3.offset, b4.offset, hsb.offset
+            ((4, 12), (4, 26), (4, 30), (4, 43), (4, 111), (0, 0), (0, 12), (0, 38), (0, 68), (0, 0))
         """
         self.subboxes = subboxes
         self.matchwidths = matchwidths
@@ -220,10 +246,6 @@ class HSplitBox(Box):
         if matchwidths:
             for b in subboxes:
                 b.expand(self.minwidth, None)
-            # if top.width >= bottom.width:
-            #     bottom.expand(top.width, None)
-            # else:
-            #     top.expand(bottom.width, None)
 
     def expand(self, width, height):
         Box.expand(self, width, height)
@@ -231,35 +253,38 @@ class HSplitBox(Box):
         if self.matchwidths:
             for b in self.subboxes:
                 b.expand(width, None)
-            # self.bottom.expand(width, None)
-            # self.top.expand(width, None)
 
         excessheight = height - self.minheight
 
-        total_ef = sum(b.expandfactor for b in self.subboxes)
+        # cumulative expand factor
+        cum_ef = list(itertools.accumulate(b.expandfactor for b in self.subboxes))
+        total_ef = cum_ef[-1]
 
         if total_ef == 0:
             # None of the subboxes want to expand,
             # so we don't expand at all.
             return
 
-        top_expansion = int(excessheight * self.top.expandfactor / total_ef)
-        bottom_expansion = excessheight - top_expansion
+        prev_cum_exp = 0
 
-        top_height = self.top.minheight + top_expansion
-        bottom_height = self.bottom.minheight + bottom_expansion
-
-        self.top.expand(None, top_height)
-        self.bottom.expand(None, bottom_height)
+        for b, ef in zip(self.subboxes, cum_ef):
+            # cumulative expansion
+            cum_exp = int(excessheight * ef / total_ef)
+            # expansion for this subbox
+            exp = cum_exp - prev_cum_exp
+            b.expand(None, b.minheight + exp)
+            prev_cum_exp = cum_exp
 
         self.update_child_offsets()
 
     def update_child_offsets(self):
-        self.top.set_parentoffset(self.offset_x, self.offset_y)
-        self.bottom.set_parentoffset(self.offset_x, self.offset_y + self.top.height)
+        offset_y = 0
+        for b in self.subboxes:
+            b.set_parentoffset(self.offset_x, self.offset_y + offset_y)
+            offset_y += b.height
 
 class VSplitBox(Box):
-    def __init__(self, left, right, matchheights=True, expandfactor=1):
+    def __init__(self, *subboxes, matchheights=True, expandfactor=1):
         """
         Makes a box around two sub boxes, arranging them horizontally.
 
@@ -334,55 +359,82 @@ class VSplitBox(Box):
 
             >>> b1.size, b2.size, vsb.size, b1.offset, b2.offset, vsb.offset
             ((10, 2), (20, 2), (35, 2), (0, 0), (10, 0), (0, 0))
+
+        Many boxes:
+            >>> b1 = Box(10, 2)
+            >>> b2 = Box(20, 1, expandfactor=3)
+            >>> b3 = Box(30, 3, expandfactor=0)
+            >>> b4 = Box(40, 4, expandfactor=1)
+            >>> vsb = VSplitBox(b1, b2, b3, b4, matchheights=True)
+
+            >>> b1.size, b2.size, b3.size, b4.size, vsb.size, b1.offset, b2.offset, b3.offset, b4.offset, vsb.offset
+            ((10, 4), (20, 4), (30, 4), (40, 4), (100, 4), (0, 0), (10, 0), (30, 0), (60, 0), (0, 0))
+
+            >>> vsb.expand(110, None)
+
+            >>> b1.size, b2.size, b3.size, b4.size, vsb.size, b1.offset, b2.offset, b3.offset, b4.offset, vsb.offset
+            ((12, 4), (26, 4), (30, 4), (42, 4), (110, 4), (0, 0), (12, 0), (38, 0), (68, 0), (0, 0))
+
+            >>> vsb.expand(109, None)
+
+            >>> b1.size, b2.size, b3.size, b4.size, vsb.size, b1.offset, b2.offset, b3.offset, b4.offset, vsb.offset
+            ((11, 4), (26, 4), (30, 4), (42, 4), (109, 4), (0, 0), (11, 0), (37, 0), (67, 0), (0, 0))
+
+            >>> vsb.expand(111, None)
+
+            >>> b1.size, b2.size, b3.size, b4.size, vsb.size, b1.offset, b2.offset, b3.offset, b4.offset, vsb.offset
+            ((12, 4), (26, 4), (30, 4), (43, 4), (111, 4), (0, 0), (12, 0), (38, 0), (68, 0), (0, 0))
         """
-        self.left = left
-        self.right = right
+        self.subboxes = subboxes
         self.matchheights = matchheights
 
-        Box.__init__(self, left.minwidth + right.minwidth, max(left.minheight, right.minheight), expandfactor)
+        Box.__init__(self, sum(b.minwidth for b in subboxes), max(b.minheight for b in subboxes), expandfactor)
 
         if matchheights:
-            if left.height >= right.height:
-                right.expand(None, left.height)
-            else:
-                left.expand(None, right.height)
+            for b in subboxes:
+                b.expand(None, self.minheight)
 
     def expand(self, width, height):
         Box.expand(self, width, height)
 
         if self.matchheights:
-            self.right.expand(None, self.left.height)
-            self.left.expand(None, self.right.height)
+            for b in self.subboxes:
+                b.expand(None, height)
 
         excesswidth = width - self.minwidth
 
-        total_ef = self.left.expandfactor + self.right.expandfactor
+        # cumulative expand factor
+        cum_ef = list(itertools.accumulate(b.expandfactor for b in self.subboxes))
+        total_ef = cum_ef[-1]
 
         if total_ef == 0:
             # Neither the left or the right want to expand,
             # so we don't expand at all.
             return
 
-        left_expansion = int(excesswidth * self.left.expandfactor / total_ef)
-        right_expansion = excesswidth - left_expansion
+        prev_cum_exp = 0
 
-        left_width = self.left.minwidth + left_expansion
-        right_width = self.right.minwidth + right_expansion
-
-        self.left.expand(left_width, None)
-        self.right.expand(right_width, None)
+        for b, ef in zip(self.subboxes, cum_ef):
+            # cumulative expansion
+            cum_exp = int(excesswidth * ef / total_ef)
+            # expansion for this subbox
+            exp = cum_exp - prev_cum_exp
+            b.expand(b.minwidth + exp, None)
+            prev_cum_exp = cum_exp
 
         self.update_child_offsets()
 
     def update_child_offsets(self):
-        self.left.set_parentoffset(self.offset_x, self.offset_y)
-        self.right.set_parentoffset(self.offset_x + self.left.width, self.offset_y)
+        offset_x = 0
+        for b in self.subboxes:
+            b.set_parentoffset(self.offset_x + offset_x, self.offset_y)
+            offset_x += b.width
 
 class LayerBox(Box):
-    def __init__(self, front, back, matchsizes=True, expandfactor=1):
+    def __init__(self, *subboxes, matchsizes=True, expandfactor=1):
         """
-        Layers two boxes directly on top of each other,
-        drawing the back box first, then drawing the front box.
+        Layers boxes directly on top of each other,
+        with the intent of drawing the boxes in order.
 
             >>> b1 = Box(3, 6)
             >>> b2 = Box(4, 5)
@@ -396,33 +448,25 @@ class LayerBox(Box):
             >>> b1.size, b2.size, lb.size, b1.offset, b2.offset, lb.offset
             ((10, 20), (10, 20), (10, 20), (0, 0), (0, 0), (0, 0))
         """
-        self.front = front
-        self.back = back
-
-        Box.__init__(self, max(front.minwidth, back.minwidth), max(front.minheight, back.minheight), expandfactor)
-
+        self.subboxes = subboxes
         self.matchsizes = matchsizes
-        if matchsizes:
-            if front.height >= back.height:
-                back.expand(None, front.height)
-            else:
-                front.expand(None, back.height)
 
-            if front.width >= back.width:
-                back.expand(front.width, None)
-            else:
-                front.expand(back.width, None)
+        Box.__init__(self, max(b.minwidth for b in subboxes), max(b.minheight for b in subboxes), expandfactor)
+
+        if matchsizes:
+            for b in subboxes:
+                b.expand(self.minwidth, self.minheight)
 
     def expand(self, width, height):
         if self.matchsizes:
-            self.front.expand(width, height)
-            self.back.expand(width, height)
+            for b in self.subboxes:
+                b.expand(width, height)
 
         Box.expand(self, width, height)
 
     def update_child_offsets(self):
-        self.front.set_parentoffset(self.offset_x, self.offset_y)
-        self.back.set_parentoffset(self.offset_x, self.offset_y)
+        for b in self.subboxes:
+            b.set_parentoffset(self.offset_x, self.offset_y)
 
 class BorderBox(Box):
     def __init__(self, innerbox, thickness=None, expandfactor=1):
