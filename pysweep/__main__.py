@@ -1,8 +1,5 @@
 #!/usr/bin/python3
 
-from PIL import Image, ImageTk
-import tkinter
-
 from .display import Display, DisplayImage, TileState
 
 from .skin import Skin
@@ -56,28 +53,34 @@ def main():
 if __name__ == '__main__':
     main()
 
-# Hack to look at the screen. I stole this from the previous code :P
-class DisplayCanvas(tkinter.Canvas):
-    """ Puts the Display Part onto a Canvas """
-    def __init__(self, master, skin):
-        self.master = master
-        self.skin = skin
+try:
+    from PIL import Image, ImageTk
+    import tkinter
 
-        self.displayimg = DisplayImage(None)
+    # Hack to look at the screen. I stole this from the previous code :P
+    class DisplayCanvas(tkinter.Canvas):
+        """ Puts the Display Part onto a Canvas """
+        def __init__(self, master, skin):
+            self.master = master
+            self.skin = skin
 
-        self.display = Display(self.displayimg, skin)
+            self.displayimg = DisplayImage(None)
 
-        self.size = self.display.size
+            self.display = Display(self.displayimg, skin)
 
-        super().__init__(self.master, width=self.size[0], height=self.size[1], highlightthickness=0)
+            self.size = self.display.size
 
-        self.img = Image.new(size=self.size, mode="RGBA")
-        self.tkimg = ImageTk.PhotoImage(self.img)
-        self.displayimg.pil_image = self.img
-        self.create_image(0, 0, image=self.tkimg, anchor='nw')
+            super().__init__(self.master, width=self.size[0], height=self.size[1], highlightthickness=0)
 
-        self.display.draw()
-        self.draw()
+            self.img = Image.new(size=self.size, mode="RGBA")
+            self.tkimg = ImageTk.PhotoImage(self.img)
+            self.displayimg.pil_image = self.img
+            self.create_image(0, 0, image=self.tkimg, anchor='nw')
 
-    def draw(self):
-        self.tkimg.paste(self.img)
+            self.display.draw()
+            self.draw()
+
+        def draw(self):
+            self.tkimg.paste(self.img)
+except:
+    pass
