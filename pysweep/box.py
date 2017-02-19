@@ -89,8 +89,7 @@ class Box:
         self.localoffset_y = 0
         self.parentoffset_x = 0
         self.parentoffset_y = 0
-        self.set_localoffset(0, 0)
-        self.set_parentoffset(0, 0)
+        self.update_child_offsets()
 
     @property
     def size(self):
@@ -142,6 +141,153 @@ class Box:
 
     def draw(self):
         pass
+
+class GridBox(Box):
+    """
+    Makes a grid of boxes.
+
+    subboxes is a list of lists where subboxes[col][row] is a Box.
+
+    Each column and row can be given expandfactors
+    to determine how much space is given to each column on expansion.
+    By default, all columns and rows will expand and space is allocated evenly
+
+    Each column and row can also be given match options
+    that determine if boxes in that column/row will be expanded to fill the space.
+    By default, all colmns and rows will try to match their sizes.
+
+    Two boxes with nonzero expandfactors:
+        >>> b1 = Box(10, 2)
+        >>> b2 = Box(20, 1)
+        >>> gb = GridBox([[b1], [b2]], colfactors=[1, 3])
+
+        >>> b1.size, b2.size, gb.size, b1.offset, b2.offset, gb.offset
+        ((10, 2), (20, 2), (30, 2), (0, 0), (10, 0), (0, 0))
+
+        >>> gb.expand(34, None)
+
+        >>> b1.size, b2.size, gb.size, b1.offset, b2.offset, gb.offset
+        ((11, 2), (23, 2), (34, 2), (0, 0), (11, 0), (0, 0))
+
+        >>> gb.expand(33, None)
+
+        >>> b1.size, b2.size, gb.size, b1.offset, b2.offset, gb.offset
+        ((10, 2), (23, 2), (33, 2), (0, 0), (10, 0), (0, 0))
+
+        >>> gb.expand(35, None)
+
+        >>> b1.size, b2.size, gb.size, b1.offset, b2.offset, gb.offset
+        ((11, 2), (24, 2), (35, 2), (0, 0), (11, 0), (0, 0))
+
+
+    Two boxes with nonzero expandfactors:
+        >>> b1 = Box(2, 10)
+        >>> b2 = Box(1, 20)
+        >>> gb = GridBox([[b1, b2]], rowfactors=[1, 3])
+
+        >>> b1.size, b2.size, gb.size, b1.offset, b2.offset, gb.offset
+        ((2, 10), (2, 20), (2, 30), (0, 0), (0, 10), (0, 0))
+
+        >>> gb.expand(None, 34)
+
+        >>> b1.size, b2.size, gb.size, b1.offset, b2.offset, gb.offset
+        ((2, 11), (2, 23), (2, 34), (0, 0), (0, 11), (0, 0))
+
+        >>> gb.expand(None, 33)
+
+        >>> b1.size, b2.size, gb.size, b1.offset, b2.offset, gb.offset
+        ((2, 10), (2, 23), (2, 33), (0, 0), (0, 10), (0, 0))
+
+        >>> gb.expand(None, 35)
+
+        >>> b1.size, b2.size, gb.size, b1.offset, b2.offset, gb.offset
+        ((2, 11), (2, 24), (2, 35), (0, 0), (0, 11), (0, 0))
+    """
+    def __init__(self, subboxes,
+            colfactors=None, rowfactors=None):
+        self.subboxes = subboxes
+        if colfactors is None:
+            colfactors = [1] * len(self.cols)
+        if rowfactors is None:
+            rowfactors = [1] * len(self.rows)
+        self.colfactors = colfactors
+        self.rowfactors = rowfactors
+
+        self.colwidths = [max(b.minwidth for b in col) for col in self.cols]
+        self.rowheights = [max(b.minheight for b in row) for row in self.rows]
+
+        self.cumcolfactors = list(itertools.accumulate(self.colfactors))
+        self.cumrowfactors = list(itertools.accumulate(self.rowfactors))
+
+        self.sumcolfactors = self.cumcolfactors[-1]
+        self.sumrowfactors = self.cumrowfactors[-1]
+
+        for colwidth, col in zip(self.colwidths, self.cols):
+            for b in col:
+                b.expand(colwidth, None)
+
+        for rowheight, row in zip(self.rowheights, self.rows):
+            for b in row:
+                b.expand(None, rowheight)
+
+        Box.__init__(self, sum(self.colwidths), sum(self.rowheights))
+
+    @property
+    def cols(self):
+        return self.subboxes
+    @property
+    def rows(self):
+        return list(zip(*self.subboxes))
+
+    def expand(self, width, height):
+        Box.expand(self, width, height)
+
+        if width is not None:
+            excesswidth = width - self.minwidth
+
+            if self.sumcolfactors == 0:
+                # None of the columns want to expand
+                # so we don't expand at all.
+                return
+
+            prev_cum_exp = 0
+
+            for col, ef in zip(self.cols, self.cumcolfactors):
+                # cumulative expansion
+                cum_exp = int(excesswidth * ef / self.sumcolfactors)
+                # expansion for this column
+                exp = cum_exp - prev_cum_exp
+                for b in col:
+                    b.expand(b.minwidth + exp, None)
+                prev_cum_exp = cum_exp
+
+        if height is not None:
+            excessheight = height - self.minheight
+
+            if self.sumrowfactors == 0:
+                # None of the rows want to expand
+                # so we don't expand at all.
+                return
+
+            prev_cum_exp = 0
+
+            for row, ef in zip(self.rows, self.cumrowfactors):
+                # cumulative expansion
+                cum_exp = int(excessheight * ef / self.sumrowfactors)
+                # expansion for this row
+                exp = cum_exp - prev_cum_exp
+                for b in row:
+                    b.expand(None, b.minheight + exp)
+                prev_cum_exp = cum_exp
+
+        self.update_child_offsets()
+
+    def update_child_offsets(self):
+        cumcolwidths = [0] + list(itertools.accumulate(col[0].width for col in self.cols))
+        cumrowheights = [0] + list(itertools.accumulate(b.height for b in self.cols[0]))
+        for col, offset_x in zip(self.cols, cumcolwidths):
+            for b, offset_y in zip(col, cumrowheights):
+                b.set_parentoffset(self.offset_x + offset_x, self.offset_y + offset_y)
 
 class HSplitBox(Box):
     def __init__(self, *subboxes, matchwidths=True, expandfactor=1):
