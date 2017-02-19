@@ -146,7 +146,7 @@ class GridBox(Box):
     """
     Makes a grid of boxes.
 
-    subboxes is a list of lists where subboxes[col][row] is a Box.
+    subboxes is a list of lists where subboxes[row][col] is a Box.
 
     Each column and row can be given expandfactors
     to determine how much space is given to each column on expansion.
@@ -159,7 +159,7 @@ class GridBox(Box):
     Two boxes with nonzero expandfactors:
         >>> b1 = Box(10, 2)
         >>> b2 = Box(20, 1)
-        >>> gb = GridBox([[b1], [b2]], colfactors=[1, 3])
+        >>> gb = GridBox([[b1, b2]], colfactors=[1, 3])
 
         >>> b1.size, b2.size, gb.size, b1.offset, b2.offset, gb.offset
         ((10, 2), (20, 2), (30, 2), (0, 0), (10, 0), (0, 0))
@@ -183,7 +183,7 @@ class GridBox(Box):
     Two boxes with nonzero expandfactors:
         >>> b1 = Box(2, 10)
         >>> b2 = Box(1, 20)
-        >>> gb = GridBox([[b1, b2]], rowfactors=[1, 3])
+        >>> gb = GridBox([[b1], [b2]], rowfactors=[1, 3])
 
         >>> b1.size, b2.size, gb.size, b1.offset, b2.offset, gb.offset
         ((2, 10), (2, 20), (2, 30), (0, 0), (0, 10), (0, 0))
@@ -233,10 +233,10 @@ class GridBox(Box):
         Box.__init__(self, sum(self.colwidths), sum(self.rowheights))
 
     @property
-    def cols(self):
+    def rows(self):
         return self.subboxes
     @property
-    def rows(self):
+    def cols(self):
         return list(zip(*self.subboxes))
 
     def expand(self, width, height):
@@ -283,11 +283,16 @@ class GridBox(Box):
         self.update_child_offsets()
 
     def update_child_offsets(self):
-        cumcolwidths = [0] + list(itertools.accumulate(col[0].width for col in self.cols))
-        cumrowheights = [0] + list(itertools.accumulate(b.height for b in self.cols[0]))
-        for col, offset_x in zip(self.cols, cumcolwidths):
-            for b, offset_y in zip(col, cumrowheights):
+        cumcolwidths = [0] + list(itertools.accumulate(b.width for b in self.rows[0]))
+        cumrowheights = [0] + list(itertools.accumulate(row[0].height for row in self.rows))
+        for row, offset_y in zip(self.rows, cumrowheights):
+            for b, offset_x in zip(row, cumcolwidths):
                 b.set_parentoffset(self.offset_x + offset_x, self.offset_y + offset_y)
+
+    def draw(self):
+        for row in self.rows:
+            for b in row:
+                b.draw()
 
 class HSplitBox(Box):
     def __init__(self, *subboxes, matchwidths=True, expandfactor=1):
