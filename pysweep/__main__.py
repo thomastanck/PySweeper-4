@@ -39,8 +39,8 @@ def main():
     displaycanvas.pack()
 
     displaycanvas.display.draw()
-    displaycanvas.display.tiles[4][2].state = TileState.Number[4]
-    displaycanvas.display.tiles[4][2].draw()
+    displaycanvas.display.tiles[2][4].state = TileState.Number[4]
+    displaycanvas.display.tiles[2][4].draw()
     displaycanvas.draw()
 
     pushwindowtotop()

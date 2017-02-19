@@ -1,5 +1,5 @@
 from enum import Enum, auto
-from .box import Thickness, Box, HSplitBox, VSplitBox, LayerBox, BorderBox
+from .box import Thickness, Box, GridBox, LayerBox, BorderBox
 
 """ Errors """
 
@@ -218,7 +218,7 @@ class BorderHEdge(GridTile):
 
         GridTile.expand(self, width, height)
 
-class Border(HSplitBox):
+class Border(GridBox):
     def __init__(self, image, skin):
         self.image, self.skin = image, skin
 
@@ -231,11 +231,7 @@ class Border(HSplitBox):
         self.b  = b  = BorderHEdge(image, skin['b.png'])
         self.br = br = BorderCorner(image, skin['br.png'])
 
-        m = Box(0, 0, expandfactor=1)
-
-        self.toprow = toprow = VSplitBox(tl, t, tr, expandfactor=0)
-        self.midrow = midrow = VSplitBox(l , m, r , expandfactor=1)
-        self.botrow = botrow = VSplitBox(bl, b, br, expandfactor=0)
+        m = Box(0, 0)
 
         self.thickness = Thickness(
                             b=b.height,
@@ -243,7 +239,7 @@ class Border(HSplitBox):
                             r=r.width,
                             t=t.height)
 
-        HSplitBox.__init__(self, toprow, midrow, botrow)
+        GridBox.__init__(self, [[tl, t, tr], [l, m, r], [bl, b, br]], colfactors=(0, 1, 0), rowfactors=(0, 1, 0))
 
 """ Parts """
 
@@ -266,7 +262,7 @@ class Counter(LayerBox):
         self.state = init_val
 
         LayerBox.__init__(self,
-            BorderBox(VSplitBox(*digits, expandfactor=0), thickness=border.thickness),
+            BorderBox(GridBox([digits]), thickness=border.thickness),
             border,
             expandfactor=0)
 
@@ -320,13 +316,7 @@ class Panel(LayerBox):
         rcounter.expandfactor = 0
 
         mainpanel = BorderBox(
-            VSplitBox(
-                lcounter,
-                Box(0, 0, expandfactor=1),
-                face,
-                Box(0, 0, expandfactor=1),
-                rcounter,
-                matchheights=False),
+            GridBox([[lcounter, Box(0, 0), face, Box(0, 0), rcounter]], rowfactors=(None,), colfactors=(0, 1, 0, 1, 0)),
             thickness=border.thickness)
 
         LayerBox.__init__(self, bg, mainpanel, border)
@@ -348,15 +338,11 @@ class Board(LayerBox):
         self.border = border
 
         self.tiles = [  [ Tile(image, skin.tile)
-                            for j in range(boardrows)]
-                        for i in range(boardcols)]
+                            for j in range(boardcols)]
+                        for i in range(boardrows)]
 
-        rows = [ HSplitBox(*self.tiles[i], expandfactor=0) for i in range(boardcols) ]
-        tilesbox = VSplitBox(*rows, expandfactor=0)
-        centered_tiles = VSplitBox(
-                            Box(0, 0, expandfactor=1),
-                            tilesbox,
-                            Box(0, 0, expandfactor=1))
+        tilesbox = GridBox(self.tiles)
+        centered_tiles = GridBox([[Box(0, 0), tilesbox, Box(0, 0)]], colfactors=(1, 0, 1))
 
         mainboard = BorderBox(centered_tiles, thickness=border.thickness)
 
@@ -403,7 +389,7 @@ class Display(LayerBox):
         self.tiles = board.tiles
 
         panelboard = BorderBox(
-            HSplitBox(panel, board),
+            GridBox([[panel], [board]]),
             thickness=border.thickness)
 
         LayerBox.__init__(self, panelboard, border)

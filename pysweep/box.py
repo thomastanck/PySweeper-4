@@ -210,8 +210,11 @@ class GridBox(Box):
             colfactors = [1] * len(self.cols)
         if rowfactors is None:
             rowfactors = [1] * len(self.rows)
-        self.colfactors = colfactors
-        self.rowfactors = rowfactors
+        self.colfactors = [(f if f is not None else 0) for f in colfactors]
+        self.rowfactors = [(f if f is not None else 0) for f in rowfactors]
+
+        self.colmatch = [(f is not None) for f in colfactors]
+        self.rowmatch = [(f is not None) for f in rowfactors]
 
         self.colwidths = [max(b.minwidth for b in col) for col in self.cols]
         self.rowheights = [max(b.minheight for b in row) for row in self.rows]
@@ -222,13 +225,15 @@ class GridBox(Box):
         self.sumcolfactors = self.cumcolfactors[-1]
         self.sumrowfactors = self.cumrowfactors[-1]
 
-        for colwidth, col in zip(self.colwidths, self.cols):
-            for b in col:
-                b.expand(colwidth, None)
+        for colwidth, col, match in zip(self.colwidths, self.cols, self.colmatch):
+            if match:
+                for b in col:
+                    b.expand(colwidth, None)
 
-        for rowheight, row in zip(self.rowheights, self.rows):
-            for b in row:
-                b.expand(None, rowheight)
+        for rowheight, row, match in zip(self.rowheights, self.rows, self.rowmatch):
+            if match:
+                for b in row:
+                    b.expand(None, rowheight)
 
         Box.__init__(self, sum(self.colwidths), sum(self.rowheights))
 
@@ -252,13 +257,14 @@ class GridBox(Box):
 
             prev_cum_exp = 0
 
-            for col, ef in zip(self.cols, self.cumcolfactors):
+            for col, ef, colwidth in zip(self.cols, self.cumcolfactors, self.colwidths):
                 # cumulative expansion
                 cum_exp = int(excesswidth * ef / self.sumcolfactors)
                 # expansion for this column
                 exp = cum_exp - prev_cum_exp
-                for b in col:
-                    b.expand(b.minwidth + exp, None)
+                for b, match in zip(col, self.colmatch):
+                    if match:
+                        b.expand(colwidth + exp, None)
                 prev_cum_exp = cum_exp
 
         if height is not None:
@@ -271,13 +277,14 @@ class GridBox(Box):
 
             prev_cum_exp = 0
 
-            for row, ef in zip(self.rows, self.cumrowfactors):
+            for row, ef, rowheight in zip(self.rows, self.cumrowfactors, self.rowheights):
                 # cumulative expansion
                 cum_exp = int(excessheight * ef / self.sumrowfactors)
                 # expansion for this row
                 exp = cum_exp - prev_cum_exp
-                for b in row:
-                    b.expand(None, b.minheight + exp)
+                for b, match in zip(row, self.rowmatch):
+                    if match:
+                        b.expand(None, rowheight + exp)
                 prev_cum_exp = cum_exp
 
         self.update_child_offsets()
@@ -293,310 +300,6 @@ class GridBox(Box):
         for row in self.rows:
             for b in row:
                 b.draw()
-
-class HSplitBox(Box):
-    def __init__(self, *subboxes, matchwidths=True, expandfactor=1):
-        """
-        Makes a box around sub boxes, arranging them vertically.
-
-        If `matchwidths` is True,
-        it will try to match the widths of two subboxes by calling `.expand` on the narrower box.
-
-        Two boxes with nonzero expandfactors:
-            >>> b1 = Box(2, 10)
-            >>> b2 = Box(1, 20, expandfactor=3)
-            >>> hsb = HSplitBox(b1, b2, matchwidths=True)
-
-            >>> b1.size, b2.size, hsb.size, b1.offset, b2.offset, hsb.offset
-            ((2, 10), (2, 20), (2, 30), (0, 0), (0, 10), (0, 0))
-
-            >>> hsb.expand(None, 34)
-
-            >>> b1.size, b2.size, hsb.size, b1.offset, b2.offset, hsb.offset
-            ((2, 11), (2, 23), (2, 34), (0, 0), (0, 11), (0, 0))
-
-            >>> hsb.expand(None, 33)
-
-            >>> b1.size, b2.size, hsb.size, b1.offset, b2.offset, hsb.offset
-            ((2, 10), (2, 23), (2, 33), (0, 0), (0, 10), (0, 0))
-
-            >>> hsb.expand(None, 35)
-
-            >>> b1.size, b2.size, hsb.size, b1.offset, b2.offset, hsb.offset
-            ((2, 11), (2, 24), (2, 35), (0, 0), (0, 11), (0, 0))
-
-        One box with zero expandfactor:
-            >>> b1 = Box(2, 10)
-            >>> b2 = Box(1, 20, expandfactor=0)
-            >>> hsb = HSplitBox(b1, b2, matchwidths=True)
-
-            >>> b1.size, b2.size, hsb.size, b1.offset, b2.offset, hsb.offset
-            ((2, 10), (2, 20), (2, 30), (0, 0), (0, 10), (0, 0))
-
-            >>> hsb.expand(None, 34)
-
-            >>> b1.size, b2.size, hsb.size, b1.offset, b2.offset, hsb.offset
-            ((2, 14), (2, 20), (2, 34), (0, 0), (0, 14), (0, 0))
-
-            >>> hsb.expand(None, 33)
-
-            >>> b1.size, b2.size, hsb.size, b1.offset, b2.offset, hsb.offset
-            ((2, 13), (2, 20), (2, 33), (0, 0), (0, 13), (0, 0))
-
-            >>> hsb.expand(None, 35)
-
-            >>> b1.size, b2.size, hsb.size, b1.offset, b2.offset, hsb.offset
-            ((2, 15), (2, 20), (2, 35), (0, 0), (0, 15), (0, 0))
-
-        Both boxes with zero expandfactors:
-            >>> b1 = Box(2, 10, expandfactor=0)
-            >>> b2 = Box(1, 20, expandfactor=0)
-            >>> hsb = HSplitBox(b1, b2, matchwidths=True)
-
-            >>> b1.size, b2.size, hsb.size, b1.offset, b2.offset, hsb.offset
-            ((2, 10), (2, 20), (2, 30), (0, 0), (0, 10), (0, 0))
-
-            >>> hsb.expand(None, 34)
-
-            >>> b1.size, b2.size, hsb.size, b1.offset, b2.offset, hsb.offset
-            ((2, 10), (2, 20), (2, 34), (0, 0), (0, 10), (0, 0))
-
-            >>> hsb.expand(None, 33)
-
-            >>> b1.size, b2.size, hsb.size, b1.offset, b2.offset, hsb.offset
-            ((2, 10), (2, 20), (2, 33), (0, 0), (0, 10), (0, 0))
-
-            >>> hsb.expand(None, 35)
-
-            >>> b1.size, b2.size, hsb.size, b1.offset, b2.offset, hsb.offset
-            ((2, 10), (2, 20), (2, 35), (0, 0), (0, 10), (0, 0))
-
-        Many boxes:
-            >>> b1 = Box(2, 10)
-            >>> b2 = Box(1, 20, expandfactor=3)
-            >>> b3 = Box(3, 30, expandfactor=0)
-            >>> b4 = Box(4, 40, expandfactor=1)
-            >>> hsb = HSplitBox(b1, b2, b3, b4, matchwidths=True)
-
-            >>> b1.size, b2.size, b3.size, b4.size, hsb.size, b1.offset, b2.offset, b3.offset, b4.offset, hsb.offset
-            ((4, 10), (4, 20), (4, 30), (4, 40), (4, 100), (0, 0), (0, 10), (0, 30), (0, 60), (0, 0))
-
-            >>> hsb.expand(None, 110)
-
-            >>> b1.size, b2.size, b3.size, b4.size, hsb.size, b1.offset, b2.offset, b3.offset, b4.offset, hsb.offset
-            ((4, 12), (4, 26), (4, 30), (4, 42), (4, 110), (0, 0), (0, 12), (0, 38), (0, 68), (0, 0))
-
-            >>> hsb.expand(None, 109)
-
-            >>> b1.size, b2.size, b3.size, b4.size, hsb.size, b1.offset, b2.offset, b3.offset, b4.offset, hsb.offset
-            ((4, 11), (4, 26), (4, 30), (4, 42), (4, 109), (0, 0), (0, 11), (0, 37), (0, 67), (0, 0))
-
-            >>> hsb.expand(None, 111)
-
-            >>> b1.size, b2.size, b3.size, b4.size, hsb.size, b1.offset, b2.offset, b3.offset, b4.offset, hsb.offset
-            ((4, 12), (4, 26), (4, 30), (4, 43), (4, 111), (0, 0), (0, 12), (0, 38), (0, 68), (0, 0))
-        """
-        self.subboxes = subboxes
-        self.matchwidths = matchwidths
-
-        Box.__init__(self, max(b.minwidth for b in subboxes), sum(b.minheight for b in subboxes), expandfactor)
-
-        if matchwidths:
-            for b in subboxes:
-                b.expand(self.minwidth, None)
-
-    def expand(self, width, height):
-        Box.expand(self, width, height)
-
-        if self.matchwidths:
-            for b in self.subboxes:
-                b.expand(width, None)
-
-        if height:
-            excessheight = height - self.minheight
-
-            # cumulative expand factor
-            cum_ef = list(itertools.accumulate(b.expandfactor for b in self.subboxes))
-            total_ef = cum_ef[-1]
-
-            if total_ef == 0:
-                # None of the subboxes want to expand,
-                # so we don't expand at all.
-                return
-
-            prev_cum_exp = 0
-
-            for b, ef in zip(self.subboxes, cum_ef):
-                # cumulative expansion
-                cum_exp = int(excessheight * ef / total_ef)
-                # expansion for this subbox
-                exp = cum_exp - prev_cum_exp
-                b.expand(None, b.minheight + exp)
-                prev_cum_exp = cum_exp
-
-        self.update_child_offsets()
-
-    def update_child_offsets(self):
-        offset_y = 0
-        for b in self.subboxes:
-            b.set_parentoffset(self.offset_x, self.offset_y + offset_y)
-            offset_y += b.height
-
-    def draw(self):
-        for b in self.subboxes:
-            b.draw()
-
-class VSplitBox(Box):
-    def __init__(self, *subboxes, matchheights=True, expandfactor=1):
-        """
-        Makes a box around two sub boxes, arranging them horizontally.
-
-        If `matchheights` is True,
-        it will try to match the heights of the two subboxes by calling `.expand` on the shorter box.
-
-        Two boxes with nonzero expandfactors:
-            >>> b1 = Box(10, 2)
-            >>> b2 = Box(20, 1, expandfactor=3)
-            >>> vsb = VSplitBox(b1, b2, matchheights=True)
-
-            >>> b1.size, b2.size, vsb.size, b1.offset, b2.offset, vsb.offset
-            ((10, 2), (20, 2), (30, 2), (0, 0), (10, 0), (0, 0))
-
-            >>> vsb.expand(34, None)
-
-            >>> b1.size, b2.size, vsb.size, b1.offset, b2.offset, vsb.offset
-            ((11, 2), (23, 2), (34, 2), (0, 0), (11, 0), (0, 0))
-
-            >>> vsb.expand(33, None)
-
-            >>> b1.size, b2.size, vsb.size, b1.offset, b2.offset, vsb.offset
-            ((10, 2), (23, 2), (33, 2), (0, 0), (10, 0), (0, 0))
-
-            >>> vsb.expand(35, None)
-
-            >>> b1.size, b2.size, vsb.size, b1.offset, b2.offset, vsb.offset
-            ((11, 2), (24, 2), (35, 2), (0, 0), (11, 0), (0, 0))
-
-        One box with zero expandfactor:
-            >>> b1 = Box(10, 2)
-            >>> b2 = Box(20, 1, expandfactor=0)
-            >>> vsb = VSplitBox(b1, b2, matchheights=True)
-
-            >>> b1.size, b2.size, vsb.size, b1.offset, b2.offset, vsb.offset
-            ((10, 2), (20, 2), (30, 2), (0, 0), (10, 0), (0, 0))
-
-            >>> vsb.expand(34, None)
-
-            >>> b1.size, b2.size, vsb.size, b1.offset, b2.offset, vsb.offset
-            ((14, 2), (20, 2), (34, 2), (0, 0), (14, 0), (0, 0))
-
-            >>> vsb.expand(33, None)
-
-            >>> b1.size, b2.size, vsb.size, b1.offset, b2.offset, vsb.offset
-            ((13, 2), (20, 2), (33, 2), (0, 0), (13, 0), (0, 0))
-
-            >>> vsb.expand(35, None)
-
-            >>> b1.size, b2.size, vsb.size, b1.offset, b2.offset, vsb.offset
-            ((15, 2), (20, 2), (35, 2), (0, 0), (15, 0), (0, 0))
-
-        Both boxes with zero expandfactors:
-            >>> b1 = Box(10, 2, expandfactor=0)
-            >>> b2 = Box(20, 1, expandfactor=0)
-            >>> vsb = VSplitBox(b1, b2, matchheights=True)
-
-            >>> b1.size, b2.size, vsb.size, b1.offset, b2.offset, vsb.offset
-            ((10, 2), (20, 2), (30, 2), (0, 0), (10, 0), (0, 0))
-
-            >>> vsb.expand(34, None)
-
-            >>> b1.size, b2.size, vsb.size, b1.offset, b2.offset, vsb.offset
-            ((10, 2), (20, 2), (34, 2), (0, 0), (10, 0), (0, 0))
-
-            >>> vsb.expand(33, None)
-
-            >>> b1.size, b2.size, vsb.size, b1.offset, b2.offset, vsb.offset
-            ((10, 2), (20, 2), (33, 2), (0, 0), (10, 0), (0, 0))
-
-            >>> vsb.expand(35, None)
-
-            >>> b1.size, b2.size, vsb.size, b1.offset, b2.offset, vsb.offset
-            ((10, 2), (20, 2), (35, 2), (0, 0), (10, 0), (0, 0))
-
-        Many boxes:
-            >>> b1 = Box(10, 2)
-            >>> b2 = Box(20, 1, expandfactor=3)
-            >>> b3 = Box(30, 3, expandfactor=0)
-            >>> b4 = Box(40, 4, expandfactor=1)
-            >>> vsb = VSplitBox(b1, b2, b3, b4, matchheights=True)
-
-            >>> b1.size, b2.size, b3.size, b4.size, vsb.size, b1.offset, b2.offset, b3.offset, b4.offset, vsb.offset
-            ((10, 4), (20, 4), (30, 4), (40, 4), (100, 4), (0, 0), (10, 0), (30, 0), (60, 0), (0, 0))
-
-            >>> vsb.expand(110, None)
-
-            >>> b1.size, b2.size, b3.size, b4.size, vsb.size, b1.offset, b2.offset, b3.offset, b4.offset, vsb.offset
-            ((12, 4), (26, 4), (30, 4), (42, 4), (110, 4), (0, 0), (12, 0), (38, 0), (68, 0), (0, 0))
-
-            >>> vsb.expand(109, None)
-
-            >>> b1.size, b2.size, b3.size, b4.size, vsb.size, b1.offset, b2.offset, b3.offset, b4.offset, vsb.offset
-            ((11, 4), (26, 4), (30, 4), (42, 4), (109, 4), (0, 0), (11, 0), (37, 0), (67, 0), (0, 0))
-
-            >>> vsb.expand(111, None)
-
-            >>> b1.size, b2.size, b3.size, b4.size, vsb.size, b1.offset, b2.offset, b3.offset, b4.offset, vsb.offset
-            ((12, 4), (26, 4), (30, 4), (43, 4), (111, 4), (0, 0), (12, 0), (38, 0), (68, 0), (0, 0))
-        """
-        self.subboxes = subboxes
-        self.matchheights = matchheights
-
-        Box.__init__(self, sum(b.minwidth for b in subboxes), max(b.minheight for b in subboxes), expandfactor)
-
-        if matchheights:
-            for b in subboxes:
-                b.expand(None, self.minheight)
-
-    def expand(self, width, height):
-        Box.expand(self, width, height)
-
-        if self.matchheights:
-            for b in self.subboxes:
-                b.expand(None, height)
-
-        if width:
-            excesswidth = width - self.minwidth
-
-            # cumulative expand factor
-            cum_ef = list(itertools.accumulate(b.expandfactor for b in self.subboxes))
-            total_ef = cum_ef[-1]
-
-            if total_ef == 0:
-                # Neither the left or the right want to expand,
-                # so we don't expand at all.
-                return
-
-            prev_cum_exp = 0
-
-            for b, ef in zip(self.subboxes, cum_ef):
-                # cumulative expansion
-                cum_exp = int(excesswidth * ef / total_ef)
-                # expansion for this subbox
-                exp = cum_exp - prev_cum_exp
-                b.expand(b.minwidth + exp, None)
-                prev_cum_exp = cum_exp
-
-        self.update_child_offsets()
-
-    def update_child_offsets(self):
-        offset_x = 0
-        for b in self.subboxes:
-            b.set_parentoffset(self.offset_x + offset_x, self.offset_y)
-            offset_x += b.width
-
-    def draw(self):
-        for b in self.subboxes:
-            b.draw()
 
 class LayerBox(Box):
     def __init__(self, *subboxes, matchsizes=True, expandfactor=1):
@@ -666,8 +369,8 @@ class BorderBox(Box):
         Box.__init__(self, innerbox.width + thickness.width, innerbox.height + thickness.height, expandfactor)
 
     def expand(self, width, height):
-        innerwidth = width - self.thickness.width if width else None
-        innerheight = height - self.thickness.height if height else None
+        innerwidth = width - self.thickness.width if width is not None else None
+        innerheight = height - self.thickness.height if height is not None else None
 
         self.innerbox.expand(innerwidth, innerheight)
 
