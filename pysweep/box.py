@@ -382,6 +382,6 @@ class BorderBox(Box):
     def draw(self):
         self.innerbox.draw()
 
-if __name__ == "__main__":
+if __name__ == "__main__": # pragma: no cover
     import doctest
     doctest.testmod(optionflags=(doctest.ELLIPSIS | doctest.IGNORE_EXCEPTION_DETAIL))

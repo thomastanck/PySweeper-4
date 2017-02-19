@@ -5,7 +5,7 @@ from .display import Display, DisplayImage, TileState
 from .skin import Skin
 from .dirstruct import Multi, Dir
 
-def pushwindowtotop():
+def pushwindowtotop(): # pragma: no cover
     import os, platform, sys
 
     if platform.system() == 'Darwin':  # How Mac OS X is identified by Python
@@ -18,7 +18,7 @@ def pushwindowtotop():
         except:
             pass
 
-def main():
+def main(): # pragma: no cover
     # from .pysweep import mw
 
     import tkinter
@@ -50,10 +50,10 @@ def main():
     except tkinter.TclError as e:
         pass
 
-if __name__ == '__main__':
+if __name__ == '__main__': # pragma: no cover
     main()
 
-try:
+try: # pragma: no cover
     from PIL import Image, ImageTk
     import tkinter
 
@@ -82,5 +82,5 @@ try:
 
         def draw(self):
             self.tkimg.paste(self.img)
-except:
+except: # pragma: no cover
     pass

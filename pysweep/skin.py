@@ -413,6 +413,6 @@ class Skin(ImageLoader):
                     raise BorderException(f'''All borders must have consistent thickness. Expected height {thickness.t} from {firstpath} but '{key}' has height {img.size[1]}.''')
 
 
-if __name__ == "__main__":
+if __name__ == "__main__": # pragma: no cover
     import doctest
     doctest.testmod(optionflags=doctest.ELLIPSIS)

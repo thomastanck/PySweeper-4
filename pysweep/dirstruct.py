@@ -246,6 +246,6 @@ class TarDir(DirBase):
     def __eq__(self, other):
         return self._tar == other._tar and self._path == other._path
 
-if __name__ == "__main__":
+if __name__ == "__main__": # pragma: no cover
     import doctest
     doctest.testmod(optionflags=doctest.ELLIPSIS)
